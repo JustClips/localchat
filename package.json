@@ -1,16 +1,20 @@
 {
-  "name": "roblox-local-chat",
+  "name": "chat-server",
   "version": "1.0.0",
-  "description": "In‑memory chat server for Roblox (username, placeId, jobId).",
+  "description": "Node.js chat server for Lua script integration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "author": "YOUR_NAME",
-  "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "uuid": "^10.0.0"
-  }
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
