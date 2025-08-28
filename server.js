@@ -1,106 +1,69 @@
-// ---------------------------------------------------------------
-//  In‑memory chat server for Roblox
-//  • /join      → registers a player, returns a short‑lived token
-//  • /message   → send a chat line (Bearer token required)
-//  • /messages  → poll for new messages (Bearer token required)
-//  Data lives only in RAM – when the process stops everything is lost.
-// ---------------------------------------------------------------
-
-const express = require('express');
-const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
+const express = require("express");
+const bodyParser = require("body-parser");
+const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ------------------------------------------------------------------
 // Middleware
-app.use(cors({ origin: '*' }));   // Roblox HttpService can call any origin
-app.use(express.json());
+app.use(cors());
+app.use(bodyParser.json());
 
-// ------------------------------------------------------------------
-// In‑memory stores
-const players = new Map();   // token → { username, placeId, jobId, expires }
-const messages = [];         // [{ username, content, timestamp }]
+// In-memory storage for messages and beacons
+let messages = [];
+let beacons = {};
 
-// ------------------------------------------------------------------
-// Helper utilities
-function jsonError(res, code, msg) {
-  return res.status(code).json({ success: false, error: msg });
-}
-
-// Periodically purge expired player entries (every minute)
-setInterval(() => {
-  const now = Date.now();
-  for (const [tok, p] of players.entries()) {
-    if (p.expires <= now) players.delete(tok);
-  }
-}, 60_000);
-
-// ------------------------------------------------------------------
-// POST /join
-//   body: { username: string, placeId: number, jobId: string }
-app.post('/join', (req, res) => {
-  const { username, placeId, jobId } = req.body;
-  if (!username || !placeId || !jobId) {
-    return jsonError(res, 400, 'Missing username / placeId / jobId');
-  }
-
-  const token = uuidv4();                     // unique session token
-  const expires = Date.now() + 60 * 60 * 1000; // 1 hour validity
-  players.set(token, { username, placeId, jobId, expires });
-
-  res.json({ success: true, token });
+// Routes
+// Messages API
+app.get("/messages", (req, res) => {
+    res.status(200).json(messages);
 });
 
-// ------------------------------------------------------------------
-// POST /message
-//   headers: Authorization: Bearer <token>
-//   body: { content: string }
-app.post('/message', (req, res) => {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) {
-    return jsonError(res, 401, 'Missing Authorization header');
-  }
-  const token = auth.slice(7);
-  const player = players.get(token);
-  if (!player) return jsonError(res, 401, 'Invalid or expired token');
+app.post("/messages", (req, res) => {
+    const { user, text } = req.body;
 
-  const { content } = req.body;
-  if (!content || typeof content !== 'string' || content.length > 200) {
-    return jsonError(res, 400, 'Invalid message content');
-  }
+    if (!user || !text) {
+        return res.status(400).json({ error: "Invalid message format" });
+    }
 
-  const timestamp = Math.floor(Date.now() / 1000);
-  messages.push({ username: player.username, content, timestamp });
+    const newMessage = {
+        user,
+        text,
+        time: new Date().toISOString()
+    };
 
-  // Optional: keep the array from growing forever (keep last 500 msgs)
-  if (messages.length > 500) messages.shift();
-
-  res.json({ success: true });
+    messages.push(newMessage);
+    res.status(200).json({ success: true, message: "Message sent!" });
 });
 
-// ------------------------------------------------------------------
-// GET /messages?since=unixTimestamp
-//   headers: Authorization: Bearer <token>
-app.get('/messages', (req, res) => {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) {
-    return jsonError(res, 401, 'Missing Authorization header');
-  }
-  const token = auth.slice(7);
-  const player = players.get(token);
-  if (!player) return jsonError(res, 401, 'Invalid or expired token');
+// Beacon API
+app.post("/beacon", (req, res) => {
+    const { userId, jobId } = req.body;
 
-  const since = Number(req.query.since) || 0;
-  const newMsgs = messages.filter(m => m.timestamp > since);
-  res.json({ success: true, messages: newMsgs });
+    if (!userId || !jobId) {
+        return res.status(400).json({ error: "Invalid beacon format" });
+    }
+
+    if (!beacons[jobId]) {
+        beacons[jobId] = new Set();
+    }
+
+    beacons[jobId].add(userId);
+    res.status(200).json({ success: true, message: "Beacon recorded" });
 });
 
-// ------------------------------------------------------------------
-// Simple health‑check (useful for Railway)
-app.get('/ping', (req, res) => res.send('pong'));
+app.get("/beacon", (req, res) => {
+    const { jobId } = req.query;
 
-// ------------------------------------------------------------------
-// Start the server
-app.listen(PORT, () => console.log(`🚀 Server listening on ${PORT}`));
+    if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+    }
+
+    const count = beacons[jobId] ? beacons[jobId].size : 0;
+    res.status(200).json({ count });
+});
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
