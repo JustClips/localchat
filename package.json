@@ -1,15 +1,14 @@
 {
   "name": "roblox-local-chat",
   "version": "1.0.0",
-  "description": "A tiny Express API for Roblox local chat (username, placeId, jobId).",
-  "main": "src/index.js",
+  "description": "In‑memory chat server for Roblox (username, placeId, jobId).",
+  "main": "server.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node server.js"
   },
   "author": "YOUR_NAME",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^9.4.3",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "uuid": "^10.0.0"
